@@ -3,12 +3,6 @@ variable "cluster_identifier" {
   type        = string
 }
 
-variable "engine_version" {
-  description = "The engine version to use"
-  type        = string
-  default     = "15.4"
-}
-
 variable "database_name" {
   description = "The name of the database to create when the cluster is created"
   type        = string

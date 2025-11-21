@@ -1,5 +1,3 @@
-
-
 resource "aws_iam_role" "bedrock_kb_role" {
   name = "${var.knowledge_base_name}-role"
 
@@ -22,7 +20,7 @@ resource "aws_iam_role_policy_attachment" "bedrock_kb_policy" {
   role       = aws_iam_role.bedrock_kb_role.name
 }
 
-# New IAM policy for RDS Data API access
+# IAM policy for RDS Data API access
 resource "aws_iam_policy" "rds_data_api_policy" {
   name        = "${var.knowledge_base_name}-rds-data-api-policy"
   path        = "/"
@@ -47,7 +45,10 @@ resource "aws_iam_policy" "rds_data_api_policy" {
         Action = [
           "secretsmanager:GetSecretValue"
         ]
-        Resource = var.aurora_secret_arn
+        Resource = [
+          var.aurora_secret_arn,
+          "arn:aws:secretsmanager:us-west-2:301447236845:secret:my-aurora-serverless-*"
+        ]
       }
     ]
   })
@@ -84,7 +85,10 @@ resource "aws_iam_policy" "bedrock_kb_rds_access" {
           "secretsmanager:GetSecretValue",
           "secretsmanager:DescribeSecret"
         ]
-        Resource = var.aurora_secret_arn
+        Resource = [
+          var.aurora_secret_arn,
+          "arn:aws:secretsmanager:us-west-2:301447236845:secret:my-aurora-serverless-*"
+        ]
       }
     ]
   })
@@ -102,31 +106,35 @@ resource "time_sleep" "wait_10_seconds" {
 }
 
 resource "aws_bedrockagent_knowledge_base" "main" {
-  name = var.knowledge_base_name
+  name     = var.knowledge_base_name
   role_arn = aws_iam_role.bedrock_kb_role.arn
+
   knowledge_base_configuration {
     vector_knowledge_base_configuration {
       embedding_model_arn = "arn:aws:bedrock:us-west-2::foundation-model/amazon.titan-embed-text-v1"
     }
     type = "VECTOR"
   }
+
   storage_configuration {
     type = "RDS"
+
     rds_configuration {
       credentials_secret_arn = var.aurora_secret_arn
-      database_name = var.aurora_db_name
-      resource_arn = var.aurora_arn
-      table_name = var.aurora_table_name
+      database_name          = var.aurora_db_name
+      resource_arn           = var.aurora_arn
+      table_name             = var.aurora_table_name
+
       field_mapping {
         primary_key_field = var.aurora_primary_key_field
-        vector_field   = var.aurora_verctor_field
-        text_field     = var.aurora_text_field
-        metadata_field = var.aurora_metadata_field
+        vector_field      = var.aurora_verctor_field
+        text_field        = var.aurora_text_field
+        metadata_field    = var.aurora_metadata_field
       }
-
     }
   }
-  depends_on = [ time_sleep.wait_10_seconds ]
+
+  depends_on = [time_sleep.wait_10_seconds]
 }
 
 data "aws_caller_identity" "current" {}
@@ -138,11 +146,14 @@ locals {
 resource "aws_bedrockagent_data_source" "s3_bedrock_bucket" {
   knowledge_base_id = aws_bedrockagent_knowledge_base.main.id
   name              = "s3_bedrock_bucket"
+
   data_source_configuration {
     type = "S3"
+
     s3_configuration {
       bucket_arn = var.s3_bucket_arn
     }
   }
-  depends_on = [ aws_bedrockagent_knowledge_base.main ]
+
+  depends_on = [aws_bedrockagent_knowledge_base.main]
 }
